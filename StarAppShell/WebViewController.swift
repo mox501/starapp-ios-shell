@@ -1,22 +1,27 @@
 import UIKit
 import WebKit
 
-final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate {
+final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, UIGestureRecognizerDelegate {
     private let config = ShellConfig.load()
     private var webView: WKWebView!
     private var splashView: UIView?
     private var refreshControl: UIRefreshControl?
+    private var edgeBackGesture: UIScreenEdgePanGestureRecognizer?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
-        config.statusBarTextColorMode == 1 ? .darkContent : .lightContent
+        config.usesDarkStatusBarText ? .darkContent : .lightContent
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(hex: config.statusBarColor) ?? .white
+        configureStatusBar()
         configureWebView()
         configureSplash()
         loadStartURL()
+    }
+
+    private func configureStatusBar() {
+        view.backgroundColor = config.effectiveStatusBarColor
     }
 
     private func configureWebView() {
@@ -26,7 +31,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        webView.allowsBackForwardNavigationGestures = config.supportRightSlideGoBack ?? true
+        webView.allowsBackForwardNavigationGestures = config.supportRightSlideGoBack != false
+        webView.backgroundColor = .white
+        webView.scrollView.backgroundColor = .white
         webView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(webView)
 
@@ -52,6 +59,13 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             refresh.addTarget(self, action: #selector(reloadPage), for: .valueChanged)
             webView.scrollView.refreshControl = refresh
             refreshControl = refresh
+        }
+        if config.supportRightSlideGoBack != false {
+            let gesture = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleEdgeBack(_:)))
+            gesture.edges = .left
+            gesture.delegate = self
+            view.addGestureRecognizer(gesture)
+            edgeBackGesture = gesture
         }
     }
 
@@ -85,6 +99,18 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     @objc private func reloadPage() {
         webView.reload()
+    }
+
+    @objc private func handleEdgeBack(_ gesture: UIScreenEdgePanGestureRecognizer) {
+        guard gesture.state == .ended, webView.canGoBack else { return }
+        webView.goBack()
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer === edgeBackGesture {
+            return webView.canGoBack
+        }
+        return true
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
