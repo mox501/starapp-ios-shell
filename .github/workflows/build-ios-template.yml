@@ -1,0 +1,53 @@
+name: Build iOS Template
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build unsigned app bundle
+        run: |
+          set -euo pipefail
+          SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
+          rm -rf Payload newipa-modern.zip
+          mkdir -p Payload/StarAppShell.app
+          python3 - <<'PYPNG'
+          from pathlib import Path
+          import base64
+          png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=')
+          Path('Payload/StarAppShell.app/splash.png').write_bytes(png)
+          PYPNG
+          cp StarAppShell/Info.plist Payload/StarAppShell.app/Info.plist
+          cp StarAppShell/config.json Payload/StarAppShell.app/config.json
+          cp StarAppShell/config.json Payload/StarAppShell.app/dconfig.json
+          swiftc \
+            -sdk "$SDK" \
+            -target arm64-apple-ios13.0 \
+            -O \
+            -parse-as-library \
+            -module-name StarAppShell \
+            -framework UIKit \
+            -framework WebKit \
+            StarAppShell/*.swift \
+            -o Payload/StarAppShell.app/StarAppShell
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' Payload/StarAppShell.app/Info.plist
+          ! strings Payload/StarAppShell.app/StarAppShell | grep -q UIWebView
+          zip -qry newipa-modern.zip Payload
+          unzip -l newipa-modern.zip | sed -n '1,80p'
+
+      - name: Upload template artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: newipa-modern
+          path: newipa-modern.zip
+          retention-days: 7
