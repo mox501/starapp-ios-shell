@@ -1,0 +1,7 @@
+DerivedData/
+build/
+Payload/
+*.xcarchive
+*.ipa
+newipa-modern.zip
+.DS_Store
