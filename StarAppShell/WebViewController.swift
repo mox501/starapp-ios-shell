@@ -20,11 +20,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     }
 
     private func configureWebView() {
-        let preferences = WKWebpagePreferences()
-        preferences.allowsContentJavaScript = true
-
         let configuration = WKWebViewConfiguration()
-        configuration.defaultWebpagePreferences = preferences
         configuration.allowsInlineMediaPlayback = true
 
         webView = WKWebView(frame: .zero, configuration: configuration)
