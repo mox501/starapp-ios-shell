@@ -1,0 +1,13 @@
+{
+  "name": "StarApp",
+  "url": "https://www.baidu.com",
+  "shellLanguage": "zh",
+  "supportSplash": false,
+  "splashTime": 0,
+  "clearCookie": false,
+  "supportPullToRefresh": false,
+  "supportRightSlideGoBack": true,
+  "supportScheme": true,
+  "statusBarColor": "#ffffff",
+  "statusBarTextColorMode": 1
+}
