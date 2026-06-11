@@ -12,6 +12,7 @@ struct ShellConfig: Decodable {
     let supportRightSlideGoBack: Bool?
     let supportScheme: Bool?
     let UserAgent: String?
+    let isSupportConfigureStatueBarColor: Bool?
     let statusBarColor: String?
     let statusBarTextColorMode: Int?
 
@@ -32,8 +33,9 @@ struct ShellConfig: Decodable {
                 supportRightSlideGoBack: true,
                 supportScheme: true,
                 UserAgent: nil,
+                isSupportConfigureStatueBarColor: false,
                 statusBarColor: nil,
-                statusBarTextColorMode: 0
+                statusBarTextColorMode: 1
             )
         }
         return config
@@ -45,6 +47,18 @@ struct ShellConfig: Decodable {
 
     var localizedNetworkError: String {
         isEnglish ? "Unable to load this page. Check your network and try again." : "页面无法打开，请检查网络后重试。"
+    }
+
+    var effectiveStatusBarColor: UIColor {
+        guard isSupportConfigureStatueBarColor == true else { return .white }
+        return UIColor(hex: statusBarColor) ?? .white
+    }
+
+    var usesDarkStatusBarText: Bool {
+        if let mode = statusBarTextColorMode {
+            return mode == 1
+        }
+        return effectiveStatusBarColor.isLight
     }
 }
 
@@ -59,5 +73,14 @@ extension UIColor {
             blue: CGFloat(value & 0xff) / 255,
             alpha: 1
         )
+    }
+
+    var isLight: Bool {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return true }
+        return (red * 0.299 + green * 0.587 + blue * 0.114) > 0.65
     }
 }

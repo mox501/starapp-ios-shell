@@ -7,6 +7,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     private var splashView: UIView?
     private var refreshControl: UIRefreshControl?
     private var edgeBackGesture: UIScreenEdgePanGestureRecognizer?
+    private var errorView: UIView?
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
         config.usesDarkStatusBarText ? .darkContent : .lightContent
@@ -31,7 +32,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        webView.allowsBackForwardNavigationGestures = config.supportRightSlideGoBack != false
+        webView.allowsBackForwardNavigationGestures = true
         webView.backgroundColor = .white
         webView.scrollView.backgroundColor = .white
         webView.translatesAutoresizingMaskIntoConstraints = false
@@ -60,13 +61,11 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             webView.scrollView.refreshControl = refresh
             refreshControl = refresh
         }
-        if config.supportRightSlideGoBack != false {
-            let gesture = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleEdgeBack(_:)))
-            gesture.edges = .left
-            gesture.delegate = self
-            view.addGestureRecognizer(gesture)
-            edgeBackGesture = gesture
-        }
+        let gesture = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleEdgeBack(_:)))
+        gesture.edges = .left
+        gesture.delegate = self
+        view.addGestureRecognizer(gesture)
+        edgeBackGesture = gesture
     }
 
     private func configureSplash() {
@@ -115,6 +114,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refreshControl?.endRefreshing()
+        errorView?.removeFromSuperview()
+        errorView = nil
         let delay = max(0, config.splashTime ?? 0)
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delay * 1000)) { [weak self] in
             UIView.animate(withDuration: 0.18, animations: {
@@ -128,11 +129,13 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
         refreshControl?.endRefreshing()
+        guard shouldShowError(error) else { return }
         showError()
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         refreshControl?.endRefreshing()
+        guard shouldShowError(error) else { return }
         showError()
     }
 
@@ -156,7 +159,20 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         decisionHandler(.cancel)
     }
 
+    private func shouldShowError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+            return false
+        }
+        if nsError.domain == "WebKitErrorDomain" && nsError.code == 102 {
+            return false
+        }
+        return true
+    }
+
     private func showError() {
+        errorView?.removeFromSuperview()
+
         let label = UILabel()
         label.text = config.localizedNetworkError
         label.textColor = .secondaryLabel
@@ -170,6 +186,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         container.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(label)
         view.addSubview(container)
+        errorView = container
 
         NSLayoutConstraint.activate([
             container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -182,8 +199,11 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             label.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -28)
         ])
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
-            container.removeFromSuperview()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { [weak self, weak container] in
+            container?.removeFromSuperview()
+            if self?.errorView === container {
+                self?.errorView = nil
+            }
         }
     }
 }
